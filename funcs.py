@@ -421,7 +421,7 @@ def running_mean(x, N):
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
 def running_mean_gaps(x, y, window, minpoints=3, blur=0):
-    ''' Slow implementation of a running mean - but deals with data gaps'''
+    ''' Slow-ish implementation of a running mean - but deals with data gaps'''
     stat = np.zeros(len(x))
     blurredstat = np.zeros(len(x))
     scan = window / 2.
@@ -444,6 +444,26 @@ def running_mean_gaps(x, y, window, minpoints=3, blur=0):
                 blurredstat[point] = 1000.
     return stat, blurredstat
 
+def normalise_stat(statdict,normstatdict,window=20):
+    '''
+    Normalises the statistic in statdict by the local std of another statistic (same keys)
+    Goes point-by-point, so gaps not accounted for.
+    '''
+    output = {}
+    for key in statdict.keys():
+        output[key] = np.zeros(len(statdict[key]))
+        for point in range(len(statdict[key])):
+            if point > window/2:
+                start = point - window/2
+            else:
+                start = 0
+            end = point+window/2
+        
+            norm = np.std(normstatdict[key][start:end])
+            output[key][point] = statdict[key][point] / norm
+    return output
+    
+    
 def make_periodogram(tts_all,tds_all,ppset,fpset,windows,statdict):
     '''
     Turns a set of transit times and lightcurve stats into a periodogram
@@ -473,8 +493,8 @@ def make_periodogram(tts_all,tds_all,ppset,fpset,windows,statdict):
             for t in range(len(tts)):
                 window = windows[np.argmin(np.abs(windows-tds[t]))]
                 timeindex = np.searchsorted(time,tts[t])
-                if timeindex < len(blurlcstat[window]):
-                    stat += blurlcstat[window][timeindex]-1
+                if timeindex < len(statdict[window]):
+                    stat += statdict[window][timeindex]-1
             periodogram[ipp,ifp] = stat
     return periodogram
         
