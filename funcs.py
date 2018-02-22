@@ -420,12 +420,12 @@ def running_mean(x, N):
     cumsum = numpy.cumsum(numpy.insert(x, 0, 0)) 
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
-def running_mean_gaps(x, y, window, minpoints=3, blur=0):
+def running_mean_gaps(x, y, window, minpoints=3, blurfactor=0):
     ''' Slow-ish implementation of a running mean - but deals with data gaps'''
     stat = np.zeros(len(x))
     blurredstat = np.zeros(len(x))
     scan = window / 2.
-    blurscan = blur / 2.
+    blurscan = (blurfactor*window) / 2.
     for point in np.arange(len(x)):
         start = np.searchsorted(x,x[point]-scan)
         end = np.searchsorted(x,x[point]+scan)
@@ -434,7 +434,7 @@ def running_mean_gaps(x, y, window, minpoints=3, blur=0):
         else:
             stat[point] = 1000.
     
-    if blur:
+    if blurfactor:
         for point in np.arange(len(x)):
             start = np.searchsorted(x,x[point]-blurscan)
             end = np.searchsorted(x,x[point]+blurscan)
@@ -444,6 +444,40 @@ def running_mean_gaps(x, y, window, minpoints=3, blur=0):
                 blurredstat[point] = 1000.
     return stat, blurredstat
 
+def extract_transit_window(tt,dur,time,flux,windows,minpoints,blurfactor):
+    '''
+    Redoes scan over a window to find what event was selected for a transit
+    '''
+    window = windows[np.argmin(np.abs(windows-dur))]
+    blurfactor = 1.5 #1.5 means a 3 duration window is scanned
+    minpoints = 3
+    
+    #what's the nearest minimum that we're triggering off
+    scan = window / 2.
+    scanregion = [np.searchsorted(time,tt-(blurfactor*window)/2.),
+                  np.searchsorted(time,tt+(blurfactor*window)/2.)]
+    stat = np.zeros(scanregion[1]-scanregion[0])
+    
+    for point in np.arange(len(time))[scanregion[0]:scanregion[1]]:
+        start = np.searchsorted(time,time[point]-scan)
+        end = np.searchsorted(time,time[point]+scan)
+        if end-start >= minpoints:
+            stat[point-scanregion[0]] = np.mean(flux[start:end]-1)
+        else:
+            stat[point-scanregion[0]] = 1000.
+    
+    scanmin = np.argmin(stat)
+    
+    #extract that flux window (and a bracket)
+    start_w = np.searchsorted(time,time[scanregion[0]+scanmin] - window*2.5)
+    end_w = np.searchsorted(time,time[scanregion[0]+scanmin] + window*2.5)
+
+    time_window = time[start_w:end_w]
+    flux_window = flux[start_w:end_w]
+    timescale = time_window - time[scanregion[0]+scanmin]
+    timescale /= window*2.5
+    return time_window,flux_window,timescale
+                 
 def normalise_stat(statdict,normstatdict,window=20):
     '''
     Normalises the statistic in statdict by the local std of another statistic (same keys)
@@ -454,17 +488,17 @@ def normalise_stat(statdict,normstatdict,window=20):
         output[key] = np.zeros(len(statdict[key]))
         for point in range(len(statdict[key])):
             if point > window/2:
-                start = point - window/2
+                start = int(point - window/2)
             else:
                 start = 0
-            end = point+window/2
-        
+            end = int(point+window/2)
+
             norm = np.std(normstatdict[key][start:end])
             output[key][point] = statdict[key][point] / norm
     return output
     
-    
-def make_periodogram(tts_all,tds_all,ppset,fpset,windows,statdict):
+
+def make_periodogram(tts_all,tds_all,time,ppset,fpset,windows,statdict):
     '''
     Turns a set of transit times and lightcurve stats into a periodogram
     This is for 2d only - just period and true anomaly
@@ -475,6 +509,8 @@ def make_periodogram(tts_all,tds_all,ppset,fpset,windows,statdict):
     				transit times from Nbody run
     tds_all 	:	dict
     				matching durations from Nbody run
+    time		:	array
+    				timestamps
     ppset		:	list or array
     				planet periods trialled
     fpset		:	list or array
@@ -494,10 +530,46 @@ def make_periodogram(tts_all,tds_all,ppset,fpset,windows,statdict):
                 window = windows[np.argmin(np.abs(windows-tds[t]))]
                 timeindex = np.searchsorted(time,tts[t])
                 if timeindex < len(statdict[window]):
-                    stat += statdict[window][timeindex]-1
+                    stat += statdict[window][timeindex]
             periodogram[ipp,ifp] = stat
     return periodogram
-        
+
+def make_periodogram_pertransit(tts_all,tds_all,time,ppset,fpset,windows,statdict):
+    '''
+    Turns a set of transit times and lightcurve stats into a periodogram
+    This is for 2d only - just period and true anomaly
+    
+    Parameters
+    ----------
+    tts_all 	: 	dict
+    				transit times from Nbody run
+    tds_all 	:	dict
+    				matching durations from Nbody run
+    time		:	array
+    				timestamps
+    ppset		:	list or array
+    				planet periods trialled
+    fpset		:	list or array
+    				true anomalies trialled
+    windows		:	list
+					Lightcurve windows used
+    statdict	:	dict
+    				Calculated lightcurve statistics (blurred or otherwise)
+    '''
+    periodogram = np.zeros([len(ppset),len(fpset)])
+    for ipp,pp in enumerate(ppset):
+        for ifp,fp in enumerate(fpset):
+            tts = tts_all[str(pp)[:6]][str(fp)[:6]]
+            tds = tds_all[str(pp)[:6]][str(fp)[:6]]
+            stat = 0
+            for t in range(len(tts)):
+                window = windows[np.argmin(np.abs(windows-tds[t]))]
+                timeindex = np.searchsorted(time,tts[t])
+                if timeindex < len(statdict[window]):
+                    stat += statdict[window][timeindex]
+            periodogram[ipp,ifp] = stat / len(tts)
+    return periodogram
+
 def stack_metric(ts, fs):
     '''Return a metric for the given stacked light curves.'''
 
