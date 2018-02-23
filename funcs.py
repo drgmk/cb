@@ -420,12 +420,12 @@ def running_mean(x, N):
     cumsum = numpy.cumsum(numpy.insert(x, 0, 0)) 
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
-def running_mean_gaps(x, y, window, minpoints=3, blurfactor=0):
+def running_mean_gaps(x, y, window, minpoints=3, blur=0):
     ''' Slow-ish implementation of a running mean - but deals with data gaps'''
     stat = np.zeros(len(x))
     blurredstat = np.zeros(len(x))
     scan = window / 2.
-    blurscan = (blurfactor*window) / 2.
+    blurscan = blur / 2.
     for point in np.arange(len(x)):
         start = np.searchsorted(x,x[point]-scan)
         end = np.searchsorted(x,x[point]+scan)
@@ -434,7 +434,7 @@ def running_mean_gaps(x, y, window, minpoints=3, blurfactor=0):
         else:
             stat[point] = 1000.
     
-    if blurfactor:
+    if blur:
         for point in np.arange(len(x)):
             start = np.searchsorted(x,x[point]-blurscan)
             end = np.searchsorted(x,x[point]+blurscan)
@@ -444,39 +444,40 @@ def running_mean_gaps(x, y, window, minpoints=3, blurfactor=0):
                 blurredstat[point] = 1000.
     return stat, blurredstat
 
-def extract_transit_window(tt,dur,time,flux,windows,minpoints,blurfactor):
+def extract_transit_window(tt,dur,time,flux,windows,minpoints=3,blurfactor=2.0):
     '''
     Redoes scan over a window to find what event was selected for a transit
     '''
     window = windows[np.argmin(np.abs(windows-dur))]
-    blurfactor = 1.5 #1.5 means a 3 duration window is scanned
-    minpoints = 3
     
     #what's the nearest minimum that we're triggering off
     scan = window / 2.
-    scanregion = [np.searchsorted(time,tt-(blurfactor*window)/2.),
-                  np.searchsorted(time,tt+(blurfactor*window)/2.)]
-    stat = np.zeros(scanregion[1]-scanregion[0])
+    scanregion = [np.searchsorted(time,tt-(blurfactor)/2.),
+                  np.searchsorted(time,tt+(blurfactor)/2.)]
+    if scanregion[1]-scanregion[0] > minpoints:
+        stat = np.zeros(scanregion[1]-scanregion[0])
     
-    for point in np.arange(len(time))[scanregion[0]:scanregion[1]]:
-        start = np.searchsorted(time,time[point]-scan)
-        end = np.searchsorted(time,time[point]+scan)
-        if end-start >= minpoints:
-            stat[point-scanregion[0]] = np.mean(flux[start:end]-1)
-        else:
-            stat[point-scanregion[0]] = 1000.
+        for point in np.arange(len(time))[scanregion[0]:scanregion[1]]:
+            start = np.searchsorted(time,time[point]-scan)
+            end = np.searchsorted(time,time[point]+scan)
+            if end-start >= minpoints:
+                stat[point-scanregion[0]] = np.mean(flux[start:end]-1)
+            else:
+                stat[point-scanregion[0]] = 1000.
     
-    scanmin = np.argmin(stat)
+        scanmin = np.argmin(stat)
     
-    #extract that flux window (and a bracket)
-    start_w = np.searchsorted(time,time[scanregion[0]+scanmin] - window*2.5)
-    end_w = np.searchsorted(time,time[scanregion[0]+scanmin] + window*2.5)
+        #extract that flux window (and a bracket)
+        start_w = np.searchsorted(time,time[scanregion[0]+scanmin] - window*3.5)
+        end_w = np.searchsorted(time,time[scanregion[0]+scanmin] + window*3.5)
 
-    time_window = time[start_w:end_w]
-    flux_window = flux[start_w:end_w]
-    timescale = time_window - time[scanregion[0]+scanmin]
-    timescale /= window*2.5
-    return time_window,flux_window,timescale
+        time_window = time[start_w:end_w]
+        flux_window = flux[start_w:end_w]
+        timescale = time_window - time[scanregion[0]+scanmin]
+        timescale /= window*3.5
+        return time_window,flux_window,timescale
+    else:
+        return [],[],[]
                  
 def normalise_stat(statdict,normstatdict,window=20):
     '''
@@ -492,9 +493,15 @@ def normalise_stat(statdict,normstatdict,window=20):
             else:
                 start = 0
             end = int(point+window/2)
-
-            norm = np.std(normstatdict[key][start:end])
-            output[key][point] = statdict[key][point] / norm
+            #norm = np.std(normstatdict[key][start:end])
+            dev = normstatdict[key][start:end] - np.median(normstatdict[key][start:end])
+            MAD = np.median(np.abs(dev))
+            output[key][point] = (statdict[key][point]) / MAD
+            #if statdict[key][point] < -0.001:
+            #    print(point)
+            #    print(MAD)
+            #    print(statdict[key][point])
+            #    print((statdict[key][point]) / MAD)
     return output
     
 
@@ -530,7 +537,8 @@ def make_periodogram(tts_all,tds_all,time,ppset,fpset,windows,statdict):
                 window = windows[np.argmin(np.abs(windows-tds[t]))]
                 timeindex = np.searchsorted(time,tts[t])
                 if timeindex < len(statdict[window]):
-                    stat += statdict[window][timeindex]
+                    if time[timeindex] - tts[t] < window:
+                        stat += statdict[window][timeindex]
             periodogram[ipp,ifp] = stat
     return periodogram
 
@@ -562,12 +570,17 @@ def make_periodogram_pertransit(tts_all,tds_all,time,ppset,fpset,windows,statdic
             tts = tts_all[str(pp)[:6]][str(fp)[:6]]
             tds = tds_all[str(pp)[:6]][str(fp)[:6]]
             stat = 0
+            tcount = 0
             for t in range(len(tts)):
                 window = windows[np.argmin(np.abs(windows-tds[t]))]
                 timeindex = np.searchsorted(time,tts[t])
                 if timeindex < len(statdict[window]):
-                    stat += statdict[window][timeindex]
-            periodogram[ipp,ifp] = stat / len(tts)
+                    if time[timeindex] - tts[t] < window:
+                    #then we're not in a gap
+                        stat += statdict[window][timeindex]
+                    tcount += 1 #gaps count for per transit normalisation
+            if tcount > 0:
+                periodogram[ipp,ifp] = stat / tcount 
     return periodogram
 
 def stack_metric(ts, fs):
@@ -577,3 +590,28 @@ def stack_metric(ts, fs):
                                            'median', bins=50)
 
     return np.min(md)
+
+def inject_u_transit(tt,td,time,flux,dep):
+    '''
+    Inject a U-shaped transit (U-shape defined as 6th order polynomial)
+    '''
+    start = np.searchsorted(time,tt-td/2.)
+    end = np.searchsorted(time,tt+td/2.)
+    fracdistancefromcent = np.abs(time[start:end]-tt)/(td/2.)
+    correction = (1. - fracdistancefromcent**6) * dep
+    flux[start:end] = flux[start:end] - correction
+    return flux
+
+def outlier_cut(time, flux, thresh, win):
+    output = np.zeros(len(time),dtype='bool')
+    for point in range(len(time)):
+        i = 1
+        start = np.searchsorted(time,time[point] - win/2.)
+        end = np.searchsorted(time,time[point] + win/2.)
+        while end - start < 10:
+            i += 1
+            start = np.searchsorted(time,time[point] - (win*i)/2.)
+            end = np.searchsorted(time,time[point] + (win*i)/2.)            
+        MAD = np.median(np.abs(flux[start:end] - np.median(flux[start:end])))
+        output[point] = np.abs(flux[point] - np.median(flux[start:end])) < thresh * MAD
+    return output
