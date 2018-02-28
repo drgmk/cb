@@ -400,7 +400,7 @@ def stack(t, f, cb, window=1, event=20):
         Transit event to pick, 20 is planet-primary, 21 planet-secondary.
     '''
 
-    all_tts = reb_cb_c(cb,tmin=np.min(t),tmax=np.max(t))
+    all_tts = reb_cb(cb,tmin=np.min(t),tmax=np.max(t))
 
     # get the sections
     ok = all_tts[:,0] == event
