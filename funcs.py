@@ -375,7 +375,7 @@ def pd_cb(cb, times=None, filed=None, filet=None, cleanup=True,
         f.write('F\n')
         f.write(' '.join( map(str,times) ))
         
-    # run the code and clean up
+    # run the code and clean up (1.17s per call, +0.05s on file writing)
     x = subprocess.run([run,filed,filet],stdout=subprocess.PIPE,check=True)
     flux = np.genfromtxt(x.stdout.splitlines(),comments='#')
 
