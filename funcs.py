@@ -615,3 +615,17 @@ def outlier_cut(time, flux, thresh, win):
         MAD = np.median(np.abs(flux[start:end] - np.median(flux[start:end])))
         output[point] = np.abs(flux[point] - np.median(flux[start:end])) < thresh * MAD
     return output
+
+def form_window(time,eclipse,totwindow,cutwindow):
+    '''
+    Return indices to cut time to a window with a central region removed
+    Typically for fitting a polynomial to a window while ignoring an eclipse in the middle
+    '''
+    start = np.searchsorted(time,eclipse-totwindow/2.)
+    end = np.searchsorted(time,eclipse+totwindow/2.)
+    start_cut = np.searchsorted(time,eclipse-cutwindow/2.)
+    end_cut = np.searchsorted(time,eclipse+cutwindow/2.)
+    indices = np.arange(end+1)
+    return indices[start:end],np.hstack((indices[start:start_cut],indices[end_cut:end]))
+    
+    
