@@ -354,7 +354,7 @@ def pd_cb(cb, times=None, filed=None, filet=None, cleanup=True,
     if filed is None and filet is None:
         filed = '/tmp/pd1-'+rstr+'-.txt'
         filet = '/tmp/pd2-'+rstr+'-.txt'
-    
+
     # write the dynamics file
     with open(filed,'w') as f:
         f.write('3 {}\n'.format(cb.t0))
@@ -370,19 +370,23 @@ def pd_cb(cb, times=None, filed=None, filet=None, cleanup=True,
         f.write('{} {} {} {} {} {}\n'.format(cb.ap, cb.ep, cb.ip, cb.wp, cb.Wp,
                                               np.mod(convfm( cb.fp, cb.ep ),2*np.pi)))
                  
-    # write the times file, we want just flux as we know the times
+    # write the times file, we want just flux and RV as we know the times
     with open(filet,'w') as f:
-        f.write('F\n')
+        f.write('F v\n')
         f.write(' '.join( map(str,times) ))
         
     # run the code and clean up (1.17s per call, +0.05s on file writing)
     x = subprocess.run([run,filed,filet],stdout=subprocess.PIPE,check=True)
-    flux = np.genfromtxt(x.stdout.splitlines(),comments='#')
 
+    res = np.genfromtxt(x.stdout.splitlines(),comments='#')
+    
+    flux = res[:,0]
+    vel = -res[:,3]
+    
     if cleanup:
         subprocess.run(['rm',filed,filet])
     
-    return flux
+    return flux, vel
 
 
 def stack(t, f, cb, window=1, event=20):
@@ -628,4 +632,14 @@ def form_window(time,eclipse,totwindow,cutwindow):
     indices = np.arange(end+1)
     return indices[start:end],np.hstack((indices[start:start_cut],indices[end_cut:end]))
     
+def smear_cadence(flux, oversample_t, t, exposure):
+    '''
+    Blurs flux model onto an observed cadence
+    '''
+    flux_smear = []
+    for point,exp in zip(t,exposure):
+        start = np.searchsorted(oversample_t,point-exp*0.5)
+        end = np.searchsorted(oversample_t,point+exp*0.5)
+        flux_smear.append(np.mean(flux[start:end]))
+    return np.array(flux_smear)
     
