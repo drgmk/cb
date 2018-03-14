@@ -3,6 +3,8 @@ import pyfits
 import sys
 import pylab as p
 p.ion()
+import warnings
+warnings.filterwarnings('once')
 
 
 def dopolyfit(win,d,ni,sigclip):
