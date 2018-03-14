@@ -189,7 +189,8 @@ def reb_cb_c(cb, tmin=None, tmax=None,
 
     return tts
 
-def reb_cb_dvm(cb, baseBody, transitingBody, tmin, tmax, timing_precision):
+def reb_cb_dvm(cb, baseBody, transitingBody, tmin, tmax, timing_precision,
+               close=0.5):
     '''Return transit times for a circumbinary system.
     
     Parameters
@@ -202,15 +203,20 @@ def reb_cb_dvm(cb, baseBody, transitingBody, tmin, tmax, timing_precision):
         Start and end times of simulation, in days.
     timing_precision : float
     	Desired precision on transit times, in years/2pi (yes the units need updating).
+    close : float
+        Close encounter distance in Hill units of secondary.
     '''
     # Load some initial stuff
     transittimes = []
     transitdurations = []
 
     # create the rebound simulation and set the units
-	
     sim = rebound.Simulation()
-		
+
+    # set close encouter distance
+    r_hill = cb.ab * (1-cb.eb) * ( cb.m2 / (cb.m1+cb.m2) )**(1/3.)
+    sim.exit_min_distance = close * r_hill
+
     # put the radii into an array, to be used later for transit calculations
     R = [cb.r1,cb.r2,cb.rp]
 	
