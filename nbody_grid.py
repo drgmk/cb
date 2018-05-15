@@ -36,8 +36,10 @@ def run_nbody_grid(system, n_period_bins=None, n_f_bins=700,
         cb = known_system_params.k34
     elif system == 'k35':
         cb = known_system_params.k35
-    elif system == 'k47':
-        cb = known_system_params.k47
+    elif system == 'k47b':
+        cb = known_system_params.k47b
+    elif system == 'k47c':
+        cb = known_system_params.k47c
     elif system == 'k64':
         cb = known_system_params.k64
     elif system == 'k413':
@@ -147,5 +149,5 @@ comp = 0
 #               transited_comp=comp)
 #run_nbody_grid('k35',lc_file='Lightcurves/K35_clean_noecl.txt',
 #               transited_comp=comp)
-run_nbody_grid('k47',lc_file='Lightcurves/K47_clean_noecl.txt',
+run_nbody_grid('k47b',lc_file='Lightcurves/K47_clean_noecl.txt',
                transited_comp=comp)
