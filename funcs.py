@@ -191,7 +191,8 @@ def reb_cb_c(cb, tmin=None, tmax=None,
 
 def reb_cb_dvm(cb, baseBody, transitingBody, tmin, tmax, timing_precision,
                close=0.5):
-    '''Return transit times for a circumbinary system.
+    '''Return transit times for a circumbinary system. 
+        Typically somewhat faster than above functions.
     
     Parameters
     ----------
@@ -428,12 +429,43 @@ def stack(t, f, cb, window=1, event=20):
     return dates, stack
 
 def running_mean(x, N):
-    '''Efficient running mean (needs gap free data)'''
+    '''Efficient running mean (needs gap free data)
+    
+    Parameters
+    ----------
+    x : ndarray
+    	Data array to calculate running mean on (cannot have gaps)
+    N : number of consecutive datapoints to average
+    '''
     cumsum = numpy.cumsum(numpy.insert(x, 0, 0)) 
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
 def running_mean_gaps(x, y, window, minpoints=3, blur=0):
-    ''' Slow-ish implementation of a running mean - but deals with data gaps'''
+    ''' Slow-ish implementation of a running mean - but deals with data gaps
+    
+    Parameters
+    ----------
+    x : 		ndarray
+    			x-axis values (e.g. time)
+    y : 		ndarray
+    			y-axis values
+    window : 	float
+    			range in x to average over
+    minpoints : int
+    			minimum points to consider for an average. Fills in with 1000 if below
+    blur :		float
+    			window over which to blur the running mean. Creates two arrays,
+    			one using maximum running mean values obver this window, the other using
+    			minimum
+    	
+    Returns
+    ----------
+    stat : 				running mean
+    blurredstat : 		if blur is not 0, the blurred stat using maximum values
+    sourcetimes : 		if blur is not 0, the time from which the maximum came from 
+    					for each point in blurredstat
+    antiblurredstat: 	if blur is not 0, the blurred stat using minimum values
+    '''
     stat = np.zeros(len(x))
     blurredstat = np.zeros(len(x))
     antiblurredstat = np.zeros(len(x))
@@ -467,8 +499,35 @@ def running_mean_gaps(x, y, window, minpoints=3, blur=0):
 def extract_transit_window_sourcetimes(tt,dur,time,flux,windows,sourcetimes,statdict,ndurs=11.):
     '''
     Redoes scan over a window to find what event was selected for a transit.
-    Uses source of statistic times calculated when statistic was made, hence more
-    reliable and simpler.
+    Uses source of statistic times calculated when statistic was made.
+    
+    Parameters
+    ----------
+    tt : 			float
+    				transit time
+    dur : 			float
+    				transit duration
+    time : 			ndarray
+    				time array
+    flux : 			ndarray
+    				flux data
+    windows :		list
+    				list of durations used to construct statdict
+    sourcetimes : 	dict
+    				each key is a value of windows, containing the sourcetimes output of
+    				a call to running_mean_gaps
+    statdict :		dict
+    				each key is a value of windows, containing the statistic being used
+    				to analyse the lightcurve
+    ndurs :			int
+    				number of transit durations to normalise output to
+    	
+    Returns
+    ----------
+    time_window	:	segment of time array around transit
+    flux_window	:	segment of flux array around transit
+    timescale	:	normalied time centred on transit time, normalised by transit
+    				duration * ndurs
     '''
     window = windows[np.argmin(np.abs(windows-dur))]
 
@@ -497,6 +556,18 @@ def normalise_stat(statdict,normstatdict,window=20):
     '''
     Normalises the statistic in statdict by the local std of another statistic (same keys)
     Goes point-by-point, so gaps not accounted for.
+    
+    Parameters
+    ----------
+    statdict		:	dict
+    					each key a transit duration, containing the lightcurve
+    					statistic for that duration
+    normstatdict	:	dict
+    					each key a transit duration, containing a lightcurve statistic
+    					for that duration. Used to normalise statdict.
+    window			:	int
+    					number of data points to consider when taking the std of
+    					normstatdict
     '''
     output = {}
     for key in statdict.keys():
