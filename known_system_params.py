@@ -36,11 +36,31 @@ k35 = funcs.CBSystem(m1 = 0.8877,f1 = 1.,m2 = 0.8094,f2 = 0.3941,
                      wp = 1.1541, fp = 1.3069, Wp = np.deg2rad(-1.24),
                      t0 = 2454965.8500)
 
+# Kepler 47
+# set t0 to primary eclipse, then compute planet true anomaly from difference between
+# eclipse and transit time. the period of the planet is empirically determined since
+# the given value (0.2956) doesn't work very well (presumably too close to binary)
 k47b = funcs.CBSystem(m1 = 1.043,f1 = 1.,m2 = 0.362,f2 = 0.00568,
                       r1 = 0.964 * u.Rsun.to('au'),r2 = 0.3506 * u.Rsun.to('au'),
                       ab = 0.0836, eb = 0.0234, ib = np.deg2rad(89.34),
                       wb = np.deg2rad(212.3), fb = np.deg2rad(-212.3+90),
                       mp = 0 * u.Mjup.to('Msun'), rp = 2.98 * u.Rearth.to('au'),
-                      ap = 0.2956, ep = 0., ip = np.deg2rad(89.59),
+                      ap = 0.293, ep = 0., ip = np.deg2rad(89.59),
                       wp = 0, fp = 2*np.pi*(31.367-29.306346)/49.514+np.pi/2, Wp = np.deg2rad(0.1),
                       t0 = -29.306346+2455000)
+
+# Kepler 38
+# at t0 B is at 17.127/18.795*360=328 or 31.95deg from line of sight (i.e. just before primary eclipse)
+# pericenter is measured from +x, so 90deg minus this is to get mean longitude at t0 = 58.0529deg
+# then subtract pericenter angle of 268deg to get mean anomaly of 149.37292deg
+# then convmf to get true anomaly of 154.78567deg
+# at t0 planet is at 37.888/105.595*360=129deg from line of sight (i.e. about a third orbit past transit)
+# if we assume pericenter is 90deg, then this is also the true anomaly
+k38 = funcs.CBSystem(m1 = 0.949,f1 = 1., m2 = 0.2491, f2 = 0.0009081,
+                     r1 = 1.757 * u.Rsun.to('au'), r2 = 0.27238 * u.Rsun.to('au'),
+                     ab = 0.14694, eb = 0.1032, ib = np.deg2rad(89.446),
+                     wb = np.deg2rad(268.68), fb = np.deg2rad(154.7856686),
+                     mp = 0 * u.Mjup.to('Msun'), rp = 2.98 * u.Rearth.to('au'),
+                     ap = 0.4644, ep = 0., ip = np.deg2rad(89.265),
+                     wp = np.pi/2, fp = np.deg2rad(129.1698), Wp = np.deg2rad(0.1),
+                     t0 = 2454970.0)
