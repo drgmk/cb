@@ -363,6 +363,7 @@ def pd_cb(cb, times=None, filed=None, filet=None, cleanup=True,
         #filet = '/Users/davidarmstrong/Software/git-repos/cb/pd_times.txt'
         filed = '/tmp/pd1-'+rstr+'-.txt'
         filet = '/tmp/pd2-'+rstr+'-.txt'
+        fileout = '/tmp/pd3-'+rstr+'-.txt'
 
     # write the dynamics file
     with open(filed,'w') as f:
@@ -383,17 +384,18 @@ def pd_cb(cb, times=None, filed=None, filet=None, cleanup=True,
     with open(filet,'w') as f:
         f.write('F v\n')
         f.write(' '.join( map(str,times) ))
-        
-    # run the code and clean up (1.17s per call, +0.05s on file writing)
-    x = subprocess.run([run,filed,filet],stdout=subprocess.PIPE,check=True)
+    
+    with open(fileout,'w') as outf:
+        # run the code and clean up (1.17s per call, +0.05s on file writing)
+        x = subprocess.run([run,filed,filet],stdout=outf,check=True)
 
-    res = np.genfromtxt(x.stdout.splitlines(),comments='#')
+    res = np.genfromtxt(fileout,comments='#')
     
     flux = res[:,0]
     vel = -res[:,3]
     
     if cleanup:
-        subprocess.run(['rm',filed,filet])
+        subprocess.run(['rm',filed,filet,fileout])
     
     return flux, vel
 
